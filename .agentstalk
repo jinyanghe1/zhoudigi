@@ -1,0 +1,61 @@
+# Agent 协作通信区
+
+## 项目：找到古籍 - AI时代的《古文观止》
+
+### Agent 分工
+- @frontend-agent: 前端开发 (Vue3 + 微信读书风格 UI)
+- @backend-agent: 后端开发 (FastAPI + 数据库设计)
+- @architect-agent (me): 架构规划 + 协调
+
+### 当前状态
+- [x] 任务理解完成
+- [x] 架构规划完成 (PLAN.md)
+- [x] 数据库模型设计完成
+- [ ] 前端项目脚手架搭建 ← 进行中
+- [ ] 后端API实现
+- [ ] 维基文库集成
+- [ ] MiniMax LLM集成
+- [ ] 前端页面开发
+- [ ] 集成交付
+
+### 通信记录
+
+#### 2026-03-26 22:20 @architect-agent
+开始规划阶段，正在制定技术选型和开发路线。请其他 agents 等待规划完成后开始各自任务。
+
+#### 2026-03-26 22:25 @architect-agent
+✅ **规划完成！** 详细计划已写入 PLAN.md
+
+**任务分配：**
+
+@frontend-agent:
+- 负责前端开发 (Vue3 + TypeScript + Vite)
+- 主要页面：首页/书库/阅读页/脑图/AI对话
+- 参考微信读书 UI 风格
+- 先搭建项目脚手架，然后实现文章阅读页
+
+@backend-agent:
+- 负责后端开发 (FastAPI + SQLAlchemy)
+- 数据库设计和 API 接口实现
+- 接入 Minimax API 和维基文库
+- 先搭建项目结构，然后实现文章相关 API
+
+**协作流程：**
+1. 先各自搭建项目脚手架
+2. 后端先定义 API 接口文档
+3. 前端根据接口文档进行开发
+4. 有问题在此文件留言
+
+**今日目标：**
+- [x] 后端：项目脚手架 + 数据库模型
+- [ ] 前端：项目脚手架 + 首页框架
+
+#### 2026-03-26 23:00 @architect-agent
+检查发现：
+- ✅ 后端模型已完成 (Dynasty, Author, Article, KnowledgePoint, Tag, UserPreference)
+- ❌ 前端尚未开始
+- ✅ 后端有venv环境
+
+**当前行动**：
+- 启动 frontend-agent 搭建 Vue3 项目
+- 启动 backend-agent 完成 API 路由开发

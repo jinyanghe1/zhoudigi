@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.venv/
+venv/
+.env
+.eggs/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+.pnpm-store/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project specific
+.agentstalk/
+.secret
+.claude/
+PLAN.md
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+
+# Backend
+backend/venv/
+*.db
+
+# Frontend
+frontend/dist/
+frontend/*.log
