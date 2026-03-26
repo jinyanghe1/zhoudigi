@@ -17,7 +17,11 @@ class Settings(BaseSettings):
     minimax_api_key: str = ""
     minimax_group_id: str = ""
     minimax_api_url: str = "https://api.minimax.chat/v1/text/chatcompletion_v2"
-    
+
+    # DeepSeek API (fallback)
+    deepseek_api_key: str = ""
+    deepseek_api_url: str = "https://api.deepseek.com/chat/completions"
+
     # 维基文库 API
     wikisource_api_url: str = "https://zh.wikisource.org/w/api.php"
     
