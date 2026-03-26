@@ -1,43 +1,78 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import type { Article } from '@/api'
+import { ref, computed } from 'vue'
+import { articleApi } from '@/api'
+import type { Article, ArticleDetail } from '@/types'
 
 export const useArticleStore = defineStore('article', () => {
+  // State
   const articles = ref<Article[]>([])
-  const currentArticle = ref<Article | null>(null)
+  const currentArticle = ref<ArticleDetail | null>(null)
   const loading = ref(false)
-
-  async function fetchArticles() {
+  const favorites = ref<number[]>([])
+  
+  // Getters
+  const favoriteArticles = computed(() => {
+    return articles.value.filter(a => favorites.value.includes(a.id))
+  })
+  
+  // Actions
+  const loadArticles = async (params = {}) => {
     loading.value = true
     try {
-      const { default: api } = await import('@/api')
-      const res = await api.get<Article[]>('/articles')
-      articles.value = res.data
-    } catch (error) {
-      console.error('Failed to fetch articles:', error)
+      const res = await articleApi.getArticles(params)
+      articles.value = res.items
+      return res
     } finally {
       loading.value = false
     }
   }
-
-  async function fetchArticle(id: number) {
+  
+  const loadArticle = async (id: number) => {
     loading.value = true
     try {
-      const { default: api } = await import('@/api')
-      const res = await api.get<Article>(`/articles/${id}`)
-      currentArticle.value = res.data
-    } catch (error) {
-      console.error('Failed to fetch article:', error)
+      currentArticle.value = await articleApi.getArticle(id)
+      return currentArticle.value
     } finally {
       loading.value = false
     }
   }
-
+  
+  const toggleFavorite = (id: number) => {
+    const index = favorites.value.indexOf(id)
+    if (index > -1) {
+      favorites.value.splice(index, 1)
+    } else {
+      favorites.value.push(id)
+    }
+    // 持久化到 localStorage
+    localStorage.setItem('favorites', JSON.stringify(favorites.value))
+  }
+  
+  const isFavorite = (id: number) => {
+    return favorites.value.includes(id)
+  }
+  
+  const loadFavorites = () => {
+    const stored = localStorage.getItem('favorites')
+    if (stored) {
+      try {
+        favorites.value = JSON.parse(stored)
+      } catch (e) {
+        console.error('解析收藏失败:', e)
+      }
+    }
+  }
+  
   return {
     articles,
     currentArticle,
     loading,
-    fetchArticles,
-    fetchArticle
+    favorites,
+    favoriteArticles,
+    loadArticles,
+    loadArticle,
+    toggleFavorite,
+    isFavorite,
+    loadFavorites
   }
 })
