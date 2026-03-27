@@ -20,7 +20,11 @@ async def get_articles(
     db: Session = Depends(get_db)
 ):
     """获取文章列表"""
-    query = db.query(ArticleModel)
+    from sqlalchemy.orm import joinedload
+    query = db.query(ArticleModel).options(
+        joinedload(ArticleModel.author),
+        joinedload(ArticleModel.dynasty)
+    )
     
     # 筛选条件
     if dynasty_id:

@@ -8,6 +8,10 @@ from app.config import settings
 class WikisourceService:
     """维基文库 API 服务"""
     
+    HEADERS = {
+        "User-Agent": "ZhaodaoGuji/1.0 (https://github.com/guji; guji@example.com)"
+    }
+    
     def __init__(self):
         self.api_url = settings.wikisource_api_url
     
@@ -31,7 +35,7 @@ class WikisourceService:
             "origin": "*"
         }
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(proxy="http://127.0.0.1:7897", headers=self.HEADERS) as client:
             try:
                 response = await client.get(
                     self.api_url,
@@ -72,7 +76,7 @@ class WikisourceService:
             "origin": "*"
         }
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(proxy="http://127.0.0.1:7897", headers=self.HEADERS) as client:
             try:
                 response = await client.get(
                     self.api_url,
@@ -122,7 +126,7 @@ class WikisourceService:
             "origin": "*"
         }
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(proxy="http://127.0.0.1:7897", headers=self.HEADERS) as client:
             try:
                 response = await client.get(
                     self.api_url,

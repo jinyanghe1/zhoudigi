@@ -4,6 +4,8 @@ from app.models.article import Article
 from app.models.knowledge_point import KnowledgePoint
 from app.models.tag import Tag, article_tag
 from app.models.user_preference import UserPreference
+from app.models.vocabulary import Vocabulary
+from app.models.ai_chat import AIChatSession, AIChatMessage
 
 __all__ = [
     "Dynasty",
@@ -12,5 +14,8 @@ __all__ = [
     "KnowledgePoint",
     "Tag",
     "article_tag",
-    "UserPreference"
+    "UserPreference",
+    "Vocabulary",
+    "AIChatSession",
+    "AIChatMessage"
 ]

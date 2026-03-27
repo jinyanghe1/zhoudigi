@@ -75,6 +75,8 @@ export interface Article {
   selection_reason?: string
   read_count: number
   word_count?: number
+  author?: AuthorWithDynasty
+  dynasty?: Dynasty
   created_at: string
   updated_at?: string
 }
@@ -89,4 +91,44 @@ export interface ArticleDetail extends Article {
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
+}
+
+export interface ExplainResult {
+  pinyin: string
+  explanation: string
+  translation?: string
+  background?: string
+}
+
+export interface VocabularyEntry {
+  id: number
+  word: string
+  pinyin?: string
+  explanation: string
+  source_text?: string
+  article_id: number
+  article_title?: string
+  dynasty_name?: string
+  mastery_level: number
+  review_count: number
+  created_at: string
+  updated_at?: string
+}
+
+export interface AIChatSession {
+  id: number
+  session_type: string
+  article_id?: number
+  title?: string
+  message_count: number
+  created_at: string
+  updated_at?: string
+}
+
+export interface AIChatMessage {
+  id: number
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  selected_text?: string
+  created_at: string
 }

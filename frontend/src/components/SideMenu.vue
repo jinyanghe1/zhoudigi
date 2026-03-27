@@ -30,6 +30,11 @@
         <span>知识图谱</span>
       </el-menu-item>
       
+      <el-menu-item index="/vocabulary">
+        <el-icon><CollectionTag /></el-icon>
+        <span>生词库</span>
+      </el-menu-item>
+      
       <el-menu-item index="/favorites">
         <el-icon><StarFilled /></el-icon>
         <span>我的收藏</span>

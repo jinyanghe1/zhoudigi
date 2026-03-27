@@ -1,9 +1,42 @@
 import axios from 'axios'
-import type { AxiosResponse } from 'axios'
-import type { Response, ListResponse, Article, ArticleDetail, Dynasty, Author, AuthorWithDynasty, KnowledgePoint } from '@/types'
+import type { AxiosInstance } from 'axios'
+import type {
+  Response,
+  ListResponse,
+  Article,
+  ArticleDetail,
+  Dynasty,
+  Author,
+  AuthorWithDynasty,
+  KnowledgePoint,
+  ExplainResult,
+  VocabularyEntry,
+  AIChatSession,
+  AIChatMessage
+} from '@/types'
+
+const CLIENT_ID_STORAGE_KEY = 'guji-client-id'
+
+const getClientId = () => {
+  if (typeof window === 'undefined') {
+    return 'anonymous'
+  }
+
+  const existingId = localStorage.getItem(CLIENT_ID_STORAGE_KEY)
+  if (existingId) {
+    return existingId
+  }
+
+  const generatedId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `guji-${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+  localStorage.setItem(CLIENT_ID_STORAGE_KEY, generatedId)
+  return generatedId
+}
 
 // 创建 axios 实例
-const api = axios.create({
+const instance: AxiosInstance = axios.create({
   baseURL: '/api',
   timeout: 30000,
   headers: {
@@ -11,19 +44,43 @@ const api = axios.create({
   }
 })
 
-// 响应拦截器
-api.interceptors.response.use(
-  (response: AxiosResponse<Response<any>>) => {
-    if (response.data.code !== 200) {
-      throw new Error(response.data.message)
+instance.interceptors.request.use((config) => {
+  const headers = config.headers ?? {}
+  headers['X-User-Id'] = getClientId()
+  config.headers = headers
+  return config
+})
+
+// 响应拦截器：解包 {code, message, data} 直接返回 data
+instance.interceptors.response.use(
+  (response) => {
+    const body = response.data as Response<any>
+    if (body.code !== 200) {
+      throw new Error(body.message)
     }
-    return response.data.data
+    return body.data as any
   },
   (error) => {
     console.error('API Error:', error)
     throw error
   }
 )
+
+// 类型安全的请求包装
+const api = {
+  async get<T>(url: string, config?: any): Promise<T> {
+    return instance.get(url, config) as any
+  },
+  async post<T>(url: string, data?: any, config?: any): Promise<T> {
+    return instance.post(url, data, config) as any
+  },
+  async put<T>(url: string, data?: any, config?: any): Promise<T> {
+    return instance.put(url, data, config) as any
+  },
+  async delete<T>(url: string, config?: any): Promise<T> {
+    return instance.delete(url, config) as any
+  }
+}
 
 // 文章相关 API
 export const articleApi = {
@@ -133,17 +190,85 @@ export const aiApi = {
   }
 }
 
+export const wordbookApi = {
+  getEntries(params: {
+    article_id?: number
+    page?: number
+    page_size?: number
+  } = {}) {
+    return api.get<ListResponse<VocabularyEntry>>('/vocabulary', { params })
+  },
+
+  createEntry(data: {
+    word: string
+    pinyin?: string
+    explanation: string
+    source_text?: string
+    article_id: number
+  }) {
+    return api.post<VocabularyEntry>('/vocabulary', data)
+  },
+
+  deleteEntry(id: number) {
+    return api.delete<{ message: string }>(`/vocabulary/${id}`)
+  },
+
+  reviewEntry(id: number) {
+    return api.post<VocabularyEntry>(`/vocabulary/${id}/review`)
+  },
+
+  explainSelection(text: string, context?: string) {
+    return api.post<ExplainResult>('/vocabulary/explain', { text, context })
+  }
+}
+
+export const aiChatApi = {
+  getArticleSession(articleId: number) {
+    return api.get<AIChatSession>('/ai-chat/article-session', {
+      params: { article_id: articleId }
+    })
+  },
+
+  getSessions(params: {
+    session_type?: string
+    article_id?: number
+  } = {}) {
+    return api.get<AIChatSession[]>('/ai-chat/sessions', { params })
+  },
+
+  createSession(data: {
+    session_type?: string
+    article_id?: number
+    title?: string
+  }) {
+    return api.post<AIChatSession>('/ai-chat/sessions', data)
+  },
+
+  getMessages(sessionId: number) {
+    return api.get<AIChatMessage[]>(`/ai-chat/sessions/${sessionId}/messages`)
+  },
+
+  sendMessage(sessionId: number, data: {
+    content: string
+    selected_text?: string
+    selected_text_context?: string
+  }) {
+    return api.post<AIChatMessage[]>(`/ai-chat/sessions/${sessionId}/messages`, data)
+  }
+}
+
 // 导出相关 API
 export const exportApi = {
   // 导出 PDF
-  exportPDF(articleIds: number[], includeTranslation = true, includeKnowledge = true) {
-    return api.post('/export/pdf', {
+  async exportPDF(articleIds: number[], includeTranslation = true, includeKnowledge = true): Promise<Blob> {
+    const response = await instance.post('/export/pdf', {
       article_ids: articleIds,
       include_translation: includeTranslation,
       include_knowledge: includeKnowledge
     }, {
       responseType: 'blob'
     })
+    return response.data as Blob
   }
 }
 

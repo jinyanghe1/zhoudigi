@@ -1,7 +1,6 @@
 <template>
   <div class="article-view">
-    <!-- 阅读器头部 -->
-    <div class="reader-header" :class="{ 'hidden': isReading }">
+    <div class="reader-header" :class="{ hidden: isReading }">
       <div class="header-left">
         <el-button text @click="goBack">
           <el-icon><ArrowLeft /></el-icon>
@@ -9,7 +8,12 @@
         </el-button>
         <span class="article-title-small">{{ article?.title }}</span>
       </div>
+
       <div class="header-right">
+        <el-button text @click="toggleAIPanel">
+          <el-icon><ChatDotRound /></el-icon>
+          问AI
+        </el-button>
         <el-button text @click="toggleKnowledgePanel">
           <el-icon><Notebook /></el-icon>
           知识点
@@ -24,18 +28,17 @@
         </el-button>
       </div>
     </div>
-    
-    <!-- 阅读器主体 -->
-    <div class="reader-container" :class="{ 'fullscreen': isFullscreen, 'no-header': isReading }">
-      <div class="reader-content" ref="contentRef">
+
+    <div class="reader-container" :class="{ fullscreen: isFullscreen, 'no-header': isReading }">
+      <div class="reader-content" @scroll="closeSelectionPopup(false)">
         <article class="article-body">
           <h1 class="article-title">{{ article?.title }}</h1>
-          
-          <div class="article-author" v-if="article?.author">
+
+          <div v-if="article?.author" class="article-author">
             <span class="dynasty">{{ article.dynasty?.name }}</span>
             <span class="author-name">{{ article.author.name }}</span>
           </div>
-          
+
           <div class="article-tabs">
             <el-radio-group v-model="viewMode" size="small">
               <el-radio-button label="original">原文</el-radio-button>
@@ -43,21 +46,19 @@
               <el-radio-button label="bilingual">对照</el-radio-button>
             </el-radio-group>
           </div>
-          
+
           <div class="article-text" :class="viewMode">
-            <!-- 原文 -->
             <div v-if="viewMode !== 'translation'" class="original-text">
               <div
                 v-for="(paragraph, index) in contentParagraphs"
                 :key="`orig-${index}`"
                 class="paragraph"
-                @click="handleTextClick($event, paragraph)"
+                @mouseup="handleParagraphSelection(paragraph)"
               >
                 {{ paragraph }}
               </div>
             </div>
-            
-            <!-- 译文 -->
+
             <div v-if="viewMode !== 'original'" class="translation-text">
               <div
                 v-for="(paragraph, index) in translationParagraphs"
@@ -69,21 +70,33 @@
             </div>
           </div>
         </article>
+
+        <ReadingSelectionPopup
+          v-if="selectionPopup.visible"
+          :x="selectionPopup.x"
+          :y="selectionPopup.y"
+          :text="selectionPopup.text"
+          :source-text="selectionPopup.sourceText"
+          :result="selectionPopup.result"
+          :loading="selectionPopup.loading"
+          :saving="selectionPopup.saving"
+          @close="closeSelectionPopup()"
+          @add="addSelectionToWordbook"
+        />
       </div>
-      
-      <!-- 知识点侧边栏 -->
+
       <transition name="slide">
-        <aside v-if="showKnowledgePanel" class="knowledge-panel">
+        <aside v-if="activePanel === 'knowledge'" class="knowledge-panel">
           <div class="panel-header">
             <h3>知识点</h3>
-            <el-button text @click="showKnowledgePanel = false">
+            <el-button text @click="activePanel = null">
               <el-icon><Close /></el-icon>
             </el-button>
           </div>
-          
+
           <div class="panel-content">
             <el-empty v-if="!knowledgePoints.length" description="暂无知识点" />
-            
+
             <div v-else class="knowledge-list">
               <div
                 v-for="point in knowledgePoints"
@@ -102,9 +115,17 @@
           </div>
         </aside>
       </transition>
+
+      <transition name="slide">
+        <ArticleAIChatPanel
+          v-if="activePanel === 'ai'"
+          :article="article"
+          :selected-text="selectionPopup.visible ? selectionPopup.text : ''"
+          :selected-context="selectionPopup.visible ? selectionPopup.sourceText : ''"
+        />
+      </transition>
     </div>
-    
-    <!-- 导出对话框 -->
+
     <el-dialog
       v-model="showExportDialog"
       title="导出文章"
@@ -118,7 +139,7 @@
       </el-form>
       <template #footer>
         <el-button @click="showExportDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleExport" :loading="exporting">
+        <el-button type="primary" :loading="exporting" @click="handleExport">
           导出 PDF
         </el-button>
       </template>
@@ -127,22 +148,51 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { articleApi, exportApi } from '@/api'
-import type { ArticleDetail, KnowledgePoint } from '@/types'
+import { ElMessage } from 'element-plus'
+import { articleApi, exportApi, wordbookApi } from '@/api'
+import ReadingSelectionPopup from '@/components/ReadingSelectionPopup.vue'
+import ArticleAIChatPanel from '@/components/ArticleAIChatPanel.vue'
+import type { ArticleDetail, ExplainResult, KnowledgePoint } from '@/types'
+
+type ViewMode = 'original' | 'translation' | 'bilingual'
+type SidePanel = 'knowledge' | 'ai' | null
+
+interface SelectionPopupState {
+  visible: boolean
+  text: string
+  sourceText: string
+  x: number
+  y: number
+  result: ExplainResult | null
+  loading: boolean
+  saving: boolean
+}
 
 const route = useRoute()
 const router = useRouter()
 
 const article = ref<ArticleDetail | null>(null)
 const knowledgePoints = ref<KnowledgePoint[]>([])
-const viewMode = ref<'original' | 'translation' | 'bilingual'>('original')
-const showKnowledgePanel = ref(false)
+const viewMode = ref<ViewMode>('original')
+const activePanel = ref<SidePanel>(null)
 const isFullscreen = ref(false)
 const isReading = ref(false)
 const showExportDialog = ref(false)
 const exporting = ref(false)
+const createDefaultSelectionPopup = (): SelectionPopupState => ({
+  visible: false,
+  text: '',
+  sourceText: '',
+  x: 16,
+  y: 16,
+  result: null,
+  loading: false,
+  saving: false
+})
+
+const selectionPopup = ref<SelectionPopupState>(createDefaultSelectionPopup())
 
 const exportOptions = ref({
   translation: true,
@@ -156,74 +206,204 @@ const typeLabel: Record<string, string> = {
 }
 
 const contentParagraphs = computed(() => {
-  return article.value?.content?.split('\n').filter(p => p.trim()) || []
+  return article.value?.content?.split('\n').filter(paragraph => paragraph.trim()) || []
 })
 
 const translationParagraphs = computed(() => {
-  return article.value?.translation?.split('\n').filter(p => p.trim()) || []
+  return article.value?.translation?.split('\n').filter(paragraph => paragraph.trim()) || []
 })
 
+const buildWordbookExplanation = (result: ExplainResult) => {
+  return [
+    result.explanation,
+    result.translation ? `译文：${result.translation}` : '',
+    result.background ? `背景：${result.background}` : ''
+  ].filter(Boolean).join('\n\n')
+}
+
+const closeSelectionPopup = (clearSelection = true) => {
+  selectionPopup.value = createDefaultSelectionPopup()
+
+  if (clearSelection) {
+    window.getSelection()?.removeAllRanges()
+  }
+}
+
 const loadArticle = async () => {
-  const id = Number(route.params.id)
-  if (!id) return
-  
+  const articleId = Number(route.params.id)
+  if (!articleId) {
+    return
+  }
+
   try {
-    article.value = await articleApi.getArticle(id)
+    article.value = await articleApi.getArticle(articleId)
     knowledgePoints.value = article.value?.knowledge_points || []
+    closeSelectionPopup(false)
   } catch (error) {
     console.error('加载文章失败:', error)
+    ElMessage.error('加载文章失败')
   }
 }
 
 const toggleKnowledgePanel = () => {
-  showKnowledgePanel.value = !showKnowledgePanel.value
+  activePanel.value = activePanel.value === 'knowledge' ? null : 'knowledge'
+}
+
+const toggleAIPanel = () => {
+  activePanel.value = activePanel.value === 'ai' ? null : 'ai'
 }
 
 const toggleFullscreen = () => {
   isFullscreen.value = !isFullscreen.value
   isReading.value = isFullscreen.value
+  closeSelectionPopup(false)
 }
 
 const goBack = () => {
   router.back()
 }
 
-const handleTextClick = (event: MouseEvent, text: string) => {
-  // 可以在这里实现选词解释功能
-  const selection = window.getSelection()?.toString()
-  if (selection) {
-    console.log('选中:', selection)
+const handleParagraphSelection = async (paragraph: string) => {
+  const selection = window.getSelection()
+  const selectedText = selection?.toString().trim() || ''
+  if (!selectedText) {
+    return
+  }
+
+  if (selectedText.length > 80) {
+    ElMessage.warning('请控制在 80 字以内，便于更准确地解释')
+    return
+  }
+
+  const range = selection?.rangeCount ? selection.getRangeAt(0) : null
+  const rect = range?.getBoundingClientRect()
+  if (!rect || (!rect.width && !rect.height)) {
+    return
+  }
+
+  const popupX = Math.min(Math.max(rect.left, 12), Math.max(12, window.innerWidth - 380))
+  const popupY = Math.min(rect.bottom + 12, Math.max(16, window.innerHeight - 520))
+
+  selectionPopup.value = {
+    visible: true,
+    text: selectedText,
+    sourceText: paragraph,
+    x: popupX,
+    y: popupY,
+    result: null,
+    loading: true,
+    saving: false
+  }
+
+  try {
+    const result = await wordbookApi.explainSelection(selectedText, paragraph)
+    if (selectionPopup.value.text !== selectedText) {
+      return
+    }
+    selectionPopup.value.result = result
+  } catch (error) {
+    console.error('划词解释失败:', error)
+    if (selectionPopup.value.text === selectedText) {
+      ElMessage.error('划词解释失败，请稍后重试')
+      selectionPopup.value.result = {
+        pinyin: '',
+        explanation: '暂时无法生成释义，请稍后再试。',
+        translation: '',
+        background: ''
+      }
+    }
+  } finally {
+    if (selectionPopup.value.text === selectedText) {
+      selectionPopup.value.loading = false
+    }
+  }
+}
+
+const addSelectionToWordbook = async () => {
+  if (!article.value || !selectionPopup.value.result) {
+    return
+  }
+
+  selectionPopup.value.saving = true
+
+  try {
+    await wordbookApi.createEntry({
+      word: selectionPopup.value.text,
+      pinyin: selectionPopup.value.result.pinyin,
+      explanation: buildWordbookExplanation(selectionPopup.value.result),
+      source_text: selectionPopup.value.sourceText,
+      article_id: article.value.id
+    })
+
+    ElMessage.success('已加入生词库')
+    closeSelectionPopup()
+  } catch (error: any) {
+    console.error('加入生词库失败:', error)
+    const detail = error?.response?.data?.detail
+    if (detail === '该生词已存在') {
+      ElMessage.warning('该内容已在生词库中')
+    } else {
+      ElMessage.error('加入生词库失败，请稍后重试')
+    }
+  } finally {
+    selectionPopup.value.saving = false
   }
 }
 
 const handleExport = async () => {
-  if (!article.value) return
-  
+  if (!article.value) {
+    return
+  }
+
   exporting.value = true
+
   try {
     const blob = await exportApi.exportPDF(
       [article.value.id],
       exportOptions.value.translation,
       exportOptions.value.knowledge
     )
-    
-    // 下载文件
+
     const url = window.URL.createObjectURL(blob as Blob)
     const link = document.createElement('a')
     link.href = url
     link.download = `${article.value.title}.pdf`
     link.click()
     window.URL.revokeObjectURL(url)
-    
+
     showExportDialog.value = false
   } catch (error) {
     console.error('导出失败:', error)
+    ElMessage.error('导出失败，请稍后重试')
   } finally {
     exporting.value = false
   }
 }
 
-onMounted(loadArticle)
+const handleDocumentClick = (event: MouseEvent) => {
+  if (!selectionPopup.value.visible) {
+    return
+  }
+
+  const target = event.target as HTMLElement | null
+  if (target?.closest('.selection-popup') || target?.closest('.paragraph')) {
+    return
+  }
+
+  closeSelectionPopup(false)
+}
+
+watch(() => route.params.id, () => {
+  void loadArticle()
+}, { immediate: true })
+
+onMounted(() => {
+  document.addEventListener('click', handleDocumentClick, true)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleDocumentClick, true)
+})
 </script>
 
 <style scoped lang="scss">
@@ -247,13 +427,14 @@ onMounted(loadArticle)
   padding: 0 24px;
   z-index: 100;
   transition: transform 0.3s;
-  
+
   &.hidden {
     transform: translateY(-100%);
   }
 }
 
-.header-left, .header-right {
+.header-left,
+.header-right {
   display: flex;
   align-items: center;
   gap: 16px;
@@ -261,7 +442,7 @@ onMounted(loadArticle)
 
 .article-title-small {
   font-weight: 500;
-  max-width: 300px;
+  max-width: 320px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -272,11 +453,8 @@ onMounted(loadArticle)
   display: flex;
   margin-top: 60px;
   overflow: hidden;
-  
-  &.fullscreen {
-    margin-top: 0;
-  }
-  
+
+  &.fullscreen,
   &.no-header {
     margin-top: 0;
   }
@@ -286,7 +464,7 @@ onMounted(loadArticle)
   flex: 1;
   overflow-y: auto;
   padding: 40px;
-  background: #f4ecd8; // 护眼模式背景
+  background: #f4ecd8;
 }
 
 .article-body {
@@ -306,11 +484,11 @@ onMounted(loadArticle)
   text-align: center;
   color: #666;
   margin-bottom: 32px;
-  
+
   .dynasty {
     margin-right: 8px;
   }
-  
+
   .author-name {
     font-weight: 500;
   }
@@ -326,17 +504,19 @@ onMounted(loadArticle)
   font-size: 18px;
   line-height: 2;
   font-family: 'Noto Serif SC', 'SimSun', serif;
-  
+
   .paragraph {
     text-indent: 2em;
     margin-bottom: 1em;
+    user-select: text;
+    cursor: text;
   }
-  
+
   &.bilingual {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 40px;
-    
+
     .original-text,
     .translation-text {
       padding: 20px;
@@ -350,9 +530,8 @@ onMounted(loadArticle)
   color: #666;
 }
 
-// 知识点面板
 .knowledge-panel {
-  width: 350px;
+  width: 360px;
   background: #fff;
   border-left: 1px solid #ebeef5;
   display: flex;
@@ -365,7 +544,7 @@ onMounted(loadArticle)
   justify-content: space-between;
   padding: 16px 20px;
   border-bottom: 1px solid #ebeef5;
-  
+
   h3 {
     margin: 0;
     font-size: 16px;
@@ -396,17 +575,17 @@ onMounted(loadArticle)
   padding: 2px 8px;
   border-radius: 4px;
   margin-bottom: 8px;
-  
+
   &.vocab {
     background: #ecf5ff;
     color: #409eff;
   }
-  
+
   &.background {
     background: #f0f9eb;
     color: #67c23a;
   }
-  
+
   &.analysis {
     background: #fdf6ec;
     color: #e6a23c;
@@ -424,7 +603,6 @@ onMounted(loadArticle)
   line-height: 1.6;
 }
 
-// 动画
 .slide-enter-active,
 .slide-leave-active {
   transition: transform 0.3s ease;

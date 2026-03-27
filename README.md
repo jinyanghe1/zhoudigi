@@ -26,29 +26,37 @@
 
 ## 🚀 快速开始
 
-### 1. 克隆项目
+### 一键启动（推荐）
+
+```bash
+cd 找到古籍
+bash start.sh
+```
+
+### 手动启动
+
+#### 1. 克隆项目
 
 ```bash
 git clone <repository-url>
 cd 找到古籍
 ```
 
-### 2. 配置环境
+#### 2. 配置环境
 
 ```bash
 # 后端配置
 cd backend
 cp .env.example .env
-# 编辑 .env 文件，填入你的 Minimax API Key
+# 编辑 .env 文件，填入你的 Minimax API Key（可选，不填则 AI 功能使用模拟数据）
 ```
 
-### 3. 启动后端
+#### 3. 启动后端
 
 ```bash
-# 使用 uv 安装依赖（推荐）
-uv pip install -r requirements.txt
+cd backend
 
-# 或使用 pip
+# 安装依赖
 pip install -r requirements.txt
 
 # 初始化数据
@@ -60,7 +68,7 @@ python run.py
 
 后端服务将在 http://localhost:8000 启动
 
-### 4. 启动前端
+#### 4. 启动前端
 
 ```bash
 cd frontend

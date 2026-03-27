@@ -58,6 +58,38 @@
       </div>
     </section>
 
+    <section class="wordbook-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <el-icon><Notebook /></el-icon>
+          最近加入的生词
+        </h2>
+        <el-button type="text" @click="goToWordbook">
+          查看生词库
+          <el-icon><ArrowRight /></el-icon>
+        </el-button>
+      </div>
+
+      <div v-if="recentWords.length" class="wordbook-grid">
+        <el-card
+          v-for="entry in recentWords"
+          :key="entry.id"
+          class="wordbook-card"
+          shadow="hover"
+          @click="goToWordbook"
+        >
+          <div class="wordbook-word">{{ entry.word }}</div>
+          <div v-if="entry.pinyin" class="wordbook-pinyin">{{ entry.pinyin }}</div>
+          <div class="wordbook-explanation">{{ entry.explanation }}</div>
+          <div class="wordbook-source">
+            {{ entry.article_title || '未知篇目' }}
+          </div>
+        </el-card>
+      </div>
+
+      <el-empty v-else description="还没有生词，去阅读页划词加入吧" />
+    </section>
+
     <!-- Categories -->
     <section class="categories-section">
       <h2 class="section-title">
@@ -85,12 +117,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { articleApi } from '@/api'
+import { articleApi, wordbookApi } from '@/api'
 import ArticleCard from '@/components/ArticleCard.vue'
-import type { Article } from '@/types'
+import type { Article, VocabularyEntry } from '@/types'
 
 const router = useRouter()
 const featuredArticles = ref<Article[]>([])
+const recentWords = ref<VocabularyEntry[]>([])
 
 const categories = [
   { name: '先秦散文', icon: 'Reading', color: '#409eff', desc: '诸子百家，思想启蒙', path: '/library/dynasty' },
@@ -108,12 +141,25 @@ const loadFeaturedArticles = async () => {
   }
 }
 
+const loadRecentWords = async () => {
+  try {
+    const res = await wordbookApi.getEntries({ page_size: 4 })
+    recentWords.value = res.items
+  } catch (error) {
+    console.error('加载生词失败:', error)
+    recentWords.value = []
+  }
+}
+
 const goToLibrary = () => router.push('/library')
 const goToAIChat = () => router.push('/ai-chat')
+const goToWordbook = () => router.push('/wordbook')
 const goToArticle = (id: number) => router.push(`/article/${id}`)
 const goToCategory = (category: any) => router.push(category.path)
 
-onMounted(loadFeaturedArticles)
+onMounted(() => {
+  void Promise.all([loadFeaturedArticles(), loadRecentWords()])
+})
 </script>
 
 <style scoped lang="scss">
@@ -213,6 +259,49 @@ onMounted(loadFeaturedArticles)
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
+}
+
+.wordbook-section {
+  margin-bottom: 40px;
+}
+
+.wordbook-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.wordbook-card {
+  cursor: pointer;
+  border-radius: 14px;
+}
+
+.wordbook-word {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.wordbook-pinyin {
+  margin-top: 6px;
+  color: #909399;
+  font-size: 13px;
+}
+
+.wordbook-explanation {
+  margin-top: 12px;
+  color: #4b5563;
+  line-height: 1.7;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wordbook-source {
+  margin-top: 14px;
+  color: #909399;
+  font-size: 13px;
 }
 
 .categories-section {

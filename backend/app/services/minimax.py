@@ -18,23 +18,13 @@ class MinimaxService:
     async def chat(
         self,
         messages: List[Dict[str, str]],
-        model: str = "abab6.5s-chat",
+        model: str = "MiniMax-Text-01",
         temperature: float = 0.7,
         max_tokens: int = 2000,
         use_fallback: bool = True
     ) -> str:
         """
         与 Minimax 模型对话，失败时自动使用 DeepSeek fallback
-
-        Args:
-            messages: 消息列表，格式 [{"role": "user", "content": "..."}]
-            model: 模型名称
-            temperature: 温度参数
-            max_tokens: 最大生成 token 数
-            use_fallback: 是否使用 DeepSeek fallback
-
-        Returns:
-            模型回复文本
         """
         if not self.api_key:
             if use_fallback and settings.deepseek_api_key:
@@ -53,7 +43,7 @@ class MinimaxService:
             "max_tokens": max_tokens
         }
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(proxy="http://127.0.0.1:7897") as client:
             try:
                 response = await client.post(
                     self.api_url,
@@ -64,9 +54,17 @@ class MinimaxService:
                 response.raise_for_status()
                 data = response.json()
 
-                if "choices" in data and len(data["choices"]) > 0:
+                # 检查 API 业务错误
+                base_resp = data.get("base_resp", {})
+                if base_resp.get("status_code", 0) != 0:
+                    error_msg = base_resp.get('status_msg', '未知错误')
+                    if use_fallback and settings.deepseek_api_key:
+                        return await self._deepseek.chat(messages, model="deepseek-chat", temperature=temperature, max_tokens=max_tokens)
+                    return f"[Minimax: {error_msg}]"
+
+                if "choices" in data and data["choices"] and len(data["choices"]) > 0:
                     return data["choices"][0]["message"]["content"]
-                return ""
+                return "[Minimax: 无回复内容]"
             except Exception as e:
                 # Minimax 失败，尝试 DeepSeek fallback
                 if use_fallback and settings.deepseek_api_key:

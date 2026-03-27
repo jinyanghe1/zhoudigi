@@ -45,6 +45,16 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '我的收藏' }
   },
   {
+    path: '/vocabulary',
+    redirect: '/wordbook'
+  },
+  {
+    path: '/wordbook',
+    name: 'Wordbook',
+    component: () => import('../views/WordbookView.vue'),
+    meta: { title: '生词库' }
+  },
+  {
     path: '/ai-chat',
     name: 'AIChat',
     component: () => import('../views/AIChatView.vue'),
@@ -57,7 +67,7 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
   // 设置页面标题
   if (to.meta.title) {
     document.title = `${to.meta.title} - 找到古籍`

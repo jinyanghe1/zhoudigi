@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional, List
 
 from app.schemas.author import AuthorWithDynasty
+from app.schemas.dynasty import Dynasty
 from app.schemas.knowledge_point import KnowledgePoint
 from app.schemas.tag import Tag
 
@@ -29,6 +30,8 @@ class Article(ArticleBase):
     word_count: Optional[int]
     created_at: datetime
     updated_at: Optional[datetime]
+    author: Optional[AuthorWithDynasty] = None
+    dynasty: Optional['Dynasty'] = None
 
     class Config:
         from_attributes = True

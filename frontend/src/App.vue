@@ -7,7 +7,7 @@
         <router-view />
       </div>
     </div>
-    <AIChatButton />
+    <AIChatButton v-if="showFloatingAIChat" />
   </div>
 </template>
 
@@ -22,6 +22,10 @@ const route = useRoute()
 
 // 阅读页面不显示侧边菜单
 const showMenu = computed(() => {
+  return !route.path.startsWith('/article/')
+})
+
+const showFloatingAIChat = computed(() => {
   return !route.path.startsWith('/article/')
 })
 </script>
